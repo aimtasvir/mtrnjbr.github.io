@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTRNJBR ADMIN | پنل مدیریت استودیو مهدی رنجبر</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'sans-serif'],
+                        display: ['Syne', 'sans-serif'],
+                        mono: ['Space Grotesk', 'monospace'],
+                    },
+                    colors: {
+                        obsidian: '#070707',
+                        charcoal: '#111111',
+                        crimson: '#ff2a2a',
+                        gold: '#e5a93c'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #070707; color: #f3f3f3; font-family: 'Vazirmatn', sans-serif; }
+        .toast-enter { animation: slideUp 0.25s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="min-h-screen antialiased">
+
+    <!-- TOP BAR -->
+    <header class="bg-charcoal border-b border-white/15 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" title="بازگشت به صفحه اصلی" class="font-display font-extrabold text-lg tracking-[0.2em] text-white hover:text-gold transition">MTRNJBR</a>
+                <span class="px-2 py-0.5 bg-crimson/20 border border-crimson/40 text-crimson font-mono text-[10px]">ADMIN PANEL</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="text-xs font-mono text-zinc-300 hover:text-white border border-white/20 px-3 py-1.5 transition">بازگشت به سایت ↗</a>
+                <button id="logout-btn" onclick="handleLogout()" class="hidden text-xs bg-crimson text-white px-3 py-1.5 font-bold hover:bg-white hover:text-black transition">خروج</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-container" class="fixed bottom-5 left-5 z-50 space-y-2 max-w-sm"></div>
+
+    <!-- LOGIN SECTION -->
+    <main id="login-section" class="max-w-md mx-auto px-4 py-20">
+        <div class="bg-charcoal border border-white/20 p-6 sm:p-8">
+            <span class="font-mono text-[10px] text-gold uppercase tracking-widest block">SUPABASE AUTHENTICATION</span>
+            <h1 class="text-2xl font-bold text-white mt-1">ورود به پنل مدیریت</h1>
+            <p class="text-xs text-zinc-400 mt-2 leading-relaxed">
+                ایمیل و رمز عبور ادمین را وارد کنید تا وارد داشبورد مدیریت محتوای سایت شوید.
+            </p>
+
+            <form onsubmit="handleLogin(event)" class="mt-6 space-y-4">
+                <div>
+                    <label class="block text-xs text-zinc-300 mb-1.5">ایمیل ادمین</label>
+                    <input type="email" id="login-email" required placeholder="metirnjbr@gmail.com" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-zinc-300 mb-1.5">رمز عبور</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                </div>
+                <button type="submit" id="login-submit-btn" class="w-full bg-white text-black hover:bg-gold font-bold py-3 text-xs uppercase tracking-wider transition">
+                    ورود به داشبورد
+                </button>
+            </form>
+            <div id="login-error" class="hidden mt-4 p-3 border border-crimson/40 bg-crimson/15 text-crimson text-xs leading-relaxed"></div>
+        </div>
+    </main>
+
+    <!-- DASHBOARD SECTION -->
+    <main id="dashboard-section" class="hidden max-w-7xl mx-auto px-4 sm:px-8 py-8">
+        <!-- Sync Default Site Content Banner -->
+        <div id="sync-default-banner" class="bg-gold/10 border border-gold/40 p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-bold text-gold">مدیریت و ویرایش محتوای فعلی سایت (۲۲ عکس، ۴ ویدیو، ۴ موزیک و ۳ مقاله)</h3>
+                <p class="text-xs text-zinc-300 mt-1 leading-relaxed">
+                    اگر لیست بخش‌های زیر خالی است (۰ نشان می‌دهد)، روی دکمه روبرو کلیک کنید تا تمام آثار فعلی سایت یک‌جا وارد دیتابیس شوند و بتوانید همه آن‌ها را ویرایش، جایگزین یا حذف کنید.
+                </p>
+            </div>
+            <button id="sync-default-btn" onclick="importDefaultSiteContent()" class="shrink-0 bg-gold text-black hover:bg-white font-bold px-5 py-2.5 text-xs transition">
+                وارد کردن محتوای فعلی سایت به پنل
+            </button>
+        </div>
+
+        <!-- Quick Overview Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+            <div class="bg-charcoal border border-white/15 p-4">
+                <span class="text-[11px] text-zinc-400 block">عکس‌های پورتفولیو</span>
+                <span id="stat-portfolio" class="text-2xl font-bold text-white font-mono mt-1 block">0</span>
+            </div>
+            <div class="bg-charcoal border border-white/15 p-4">
+                <span class="text-[11px] text-zinc-400 block">ویدیو و تیزر</span>
+                <span id="stat-videos" class="text-2xl font-bold text-white font-mono mt-1 block">0</span>
+            </div>
+            <div class="bg-charcoal border border-white/15 p-4">
+                <span class="text-[11px] text-zinc-400 block">قطعات موزیک</span>
+                <span id="stat-music" class="text-2xl font-bold text-white font-mono mt-1 block">0</span>
+            </div>
+            <div class="bg-charcoal border border-white/15 p-4">
+                <span class="text-[11px] text-zinc-400 block">مقالات</span>
+                <span id="stat-articles" class="text-2xl font-bold text-white font-mono mt-1 block">0</span>
+            </div>
+            <div class="bg-charcoal border border-gold/40 p-4 col-span-2 sm:col-span-1">
+                <span class="text-[11px] text-gold block">در انتظار تایید کاربران</span>
+                <span id="stat-pending" class="text-2xl font-bold text-gold font-mono mt-1 block">0</span>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/15 pb-4 mb-8">
+            <div class="flex flex-wrap gap-2">
+                <button onclick="switchTab('portfolio')" data-tab="portfolio" class="tab-btn bg-white text-black px-4 py-2 text-xs font-bold transition">عکس‌های پورتفولیو (<span id="count-portfolio">0</span>)</button>
+                <button onclick="switchTab('videos')" data-tab="videos" class="tab-btn border border-white/20 text-zinc-300 px-4 py-2 text-xs transition">ویدیو و تیزر (<span id="count-videos">0</span>)</button>
+                <button onclick="switchTab('music')" data-tab="music" class="tab-btn border border-white/20 text-zinc-300 px-4 py-2 text-xs transition">موزیک AI (<span id="count-music">0</span>)</button>
+                <button onclick="switchTab('articles')" data-tab="articles" class="tab-btn border border-white/20 text-zinc-300 px-4 py-2 text-xs transition">مقالات (<span id="count-articles">0</span>)</button>
+                <button onclick="switchTab('orders')" data-tab="orders" class="tab-btn border border-white/20 text-zinc-300 px-4 py-2 text-xs transition">سفارش‌های پروژه (<span id="count-orders">0</span>)</button>
+            </div>
+            <button onclick="loadAllData()" class="border border-gold/50 text-gold hover:bg-gold hover:text-black px-3.5 py-2 text-xs font-mono transition flex items-center gap-1.5">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>بروزرسانی</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: PORTFOLIO PHOTOS -->
+        <section id="tab-portfolio" class="tab-panel space-y-8">
+            <div class="bg-charcoal border border-white/20 p-5 sm:p-6">
+                <h3 class="text-base font-bold text-gold mb-1">+ افزودن عکس جدید به پورتفولیو</h3>
+                <p class="text-xs text-zinc-400 mb-4">پس از ثبت، عکس همراه با عنوان و توضیحات مستقیماً در بخش عکس‌های صفحه پورتفولیو نمایش داده می‌شود.</p>
+                <form onsubmit="addAdminPortfolio(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" id="ap-title" required placeholder="عنوان عکس *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <select id="ap-category" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        <option value="monochrome">سیاه‌وسفید و سایه (monochrome)</option>
+                        <option value="portrait">پرتره و روایت (portrait)</option>
+                        <option value="city">شهر و معماری (city)</option>
+                    </select>
+                    <input type="text" id="ap-tag" placeholder="تگ (مثلاً: STREET CINEMA)" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="file" id="ap-file" accept="image/*" required class="bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    <textarea id="ap-desc" rows="2" placeholder="توضیحات عکس (Description)..." class="sm:col-span-2 bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none"></textarea>
+                    <button type="submit" class="sm:col-span-2 bg-white text-black hover:bg-gold font-bold py-2.5 text-xs uppercase transition">آپلود و انتشار فوری در پورتفولیو</button>
+                </form>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-white mb-4">مدیریت عکس‌های پورتفولیو (آثار شما و ارسالی‌های کاربران)</h2>
+                <div id="portfolio-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </section>
+
+        <!-- TAB 2: VIDEOS & TEASERS -->
+        <section id="tab-videos" class="tab-panel hidden space-y-8">
+            <div class="bg-charcoal border border-white/20 p-5 sm:p-6">
+                <h3 class="text-base font-bold text-gold mb-1">+ افزودن ویدیو یا تیزر جدید به پورتفولیو</h3>
+                <p class="text-xs text-zinc-400 mb-4">ویدیوی ثبت‌شده مستقیماً در بخش نمایشگر ویدیوها و تیزرهای صفحه پورتفولیو قرار می‌گیرد.</p>
+                <form onsubmit="addAdminVideo(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" id="av-title" required placeholder="عنوان ویدیو / تیزر *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="text" id="av-duration" placeholder="مدت زمان (مثلاً: 0:30)" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">آپلود فایل ویدیو (MP4 / WebM)</label>
+                        <input type="file" id="av-file" accept="video/*" class="w-full bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">یا لینک مستقیم ویدیو (اختیاری اگر فایل انتخاب کردید)</label>
+                        <input type="url" id="av-url" placeholder="https://example.com/teaser.mp4" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <textarea id="av-desc" rows="2" placeholder="توضیحات ویدیو (کارگردانی، تدوین، لوکیشن)..." class="sm:col-span-2 bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none"></textarea>
+                    <button type="submit" class="sm:col-span-2 bg-white text-black hover:bg-gold font-bold py-2.5 text-xs uppercase transition">آپلود و انتشار فوری ویدیو در پورتفولیو</button>
+                </form>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-white mb-4">مدیریت ویدیوها و تیزرها</h2>
+                <div id="videos-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: MUSIC -->
+        <section id="tab-music" class="tab-panel hidden space-y-8">
+            <div class="bg-charcoal border border-white/20 p-5 sm:p-6">
+                <h3 class="text-base font-bold text-gold mb-1">+ افزودن موزیک جدید به صفحه موزیک</h3>
+                <p class="text-xs text-zinc-400 mb-4">قطعه اضافه شده بلافاصله در لیست پخش صفحه موزیک سایت نمایش داده می‌شود.</p>
+                <form onsubmit="addAdminMusic(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" id="am-title" required placeholder="نام قطعه *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="text" id="am-genre" required placeholder="سبک (مثلاً: Dark Ambient • Suno AI) *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="text" id="am-duration" required placeholder="مدت زمان (مثلاً: 03:20) *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="file" id="am-file" accept="audio/*" required class="bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    <button type="submit" class="sm:col-span-2 bg-white text-black hover:bg-gold font-bold py-2.5 text-xs uppercase transition">آپلود و انتشار فوری موزیک</button>
+                </form>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-white mb-4">مدیریت موزیک‌ها (آثار شما و ارسالی‌های کاربران)</h2>
+                <div id="music-list" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <!-- TAB 4: ARTICLES -->
+        <section id="tab-articles" class="tab-panel hidden space-y-8">
+            <div class="bg-charcoal border border-white/20 p-5 sm:p-6">
+                <h3 class="text-base font-bold text-gold mb-1">+ نوشتن و انتشار مقاله جدید</h3>
+                <p class="text-xs text-zinc-400 mb-4">مقاله ثبت شده مستقیماً در صفحه مقالات و روایتگری نمایش داده می‌شود.</p>
+                <form onsubmit="addAdminArticle(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" id="aa-title" required placeholder="عنوان مقاله *" class="sm:col-span-2 bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="text" id="aa-category" required placeholder="دسته‌بندی (مثلاً: FILMMAKING) *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <input type="text" id="aa-readtime" required placeholder="زمان مطالعه (مثلاً: ۵ دقیقه) *" class="bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    <textarea id="aa-summary" rows="2" required placeholder="خلاصه مقاله *" class="sm:col-span-2 bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none"></textarea>
+                    <textarea id="aa-content" rows="6" required placeholder="متن کامل مقاله *" class="sm:col-span-2 bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none"></textarea>
+                    <button type="submit" class="sm:col-span-2 bg-white text-black hover:bg-gold font-bold py-2.5 text-xs uppercase transition">انتشار فوری مقاله</button>
+                </form>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-white mb-4">مدیریت مقالات (مقالات شما و ارسالی‌های کاربران)</h2>
+                <div id="articles-list" class="space-y-4"></div>
+            </div>
+        </section>
+
+        <!-- TAB 5: ORDERS -->
+        <section id="tab-orders" class="tab-panel hidden space-y-4">
+            <h2 class="text-lg font-bold text-white mb-4">لیست سفارش‌های پروژه ثبت شده</h2>
+            <div id="orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+    </main>
+
+    <!-- EDIT / REPLACE MODAL -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-charcoal border border-white/25 max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 relative">
+            <button onclick="closeEditModal()" class="absolute top-5 left-5 text-zinc-400 hover:text-white text-lg font-mono">✕</button>
+            <span class="font-mono text-[10px] text-gold uppercase tracking-widest block">EDIT & REPLACE</span>
+            <h3 id="edit-modal-title" class="text-xl font-bold text-white mt-1 mb-5">ویرایش آیتم</h3>
+            <form id="edit-modal-form" onsubmit="submitEditModal(event)" class="space-y-4">
+                <div id="edit-modal-fields" class="space-y-4"></div>
+                <div class="flex items-center gap-3 pt-2">
+                    <button type="submit" id="edit-submit-btn" class="flex-1 bg-gold text-black hover:bg-white font-bold py-2.5 text-xs uppercase transition">ذخیره تغییرات</button>
+                    <button type="button" onclick="closeEditModal()" class="px-5 py-2.5 border border-white/20 text-zinc-300 hover:text-white text-xs transition">انصراف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        // ==========================================
+        // SUPABASE CONFIGURATION
+        // ==========================================
+        const SUPABASE_URL = "https://vcbicivdpbkltlarmnit.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_C38KVIdMq0Qz67dzKzyuxA_JqIfd_m7";
+        const STORAGE_BUCKET = "Media";
+
+        const sbClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : null;
+
+        let pendingCount = 0;
+        let cachedPortfolio = [];
+        let cachedMusic = [];
+        let cachedArticles = [];
+        let currentEditCtx = null;
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200',
+                error: 'bg-red-950/95 border-crimson/60 text-red-200',
+                info: 'bg-zinc-900/95 border-gold/50 text-gold'
+            };
+            toast.className = `toast-enter px-4 py-3 border text-xs shadow-lg ${colors[type] || colors.info}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        function translateAuthError(message = '') {
+            const msg = message.toLowerCase();
+            if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+                return 'ایمیل یا رمز عبور اشتباه است، یا چنین کاربری در سیستم وجود ندارد.';
+            }
+            if (msg.includes('email not confirmed')) {
+                return 'ایمیل این حساب کاربری هنوز تأیید نشده است.';
+            }
+            if (msg.includes('rate limit') || msg.includes('too many requests')) {
+                return 'تعداد تلاش‌های ناموفق زیاد بوده است؛ لطفاً چند لحظه بعد دوباره امتحان کنید.';
+            }
+            if (msg.includes('fetch') || msg.includes('network')) {
+                return 'خطا در برقراری ارتباط با سرور. لطفاً اتصال اینترنت یا فیلترشکن خود را بررسی کنید.';
+            }
+            return 'ورود ناموفق بود. لطفاً ایمیل و رمز عبور خود را بررسی کنید.';
+        }
+
+        async function checkSession() {
+            lucide.createIcons();
+            if (!sbClient) return;
+            try {
+                const { data: { session } } = await sbClient.auth.getSession();
+                if (session) showDashboard();
+            } catch (err) {
+                console.error('Session check error:', err);
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-submit-btn');
+            const errBox = document.getElementById('login-error');
+            errBox.classList.add('hidden');
+
+            if (!sbClient) {
+                errBox.classList.remove('hidden');
+                errBox.textContent = 'خطا در بارگذاری سرویس احراز هویت. لطفاً صفحه را رفرش کنید.';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'در حال بررسی اطلاعات...';
+
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const { error } = await sbClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    errBox.classList.remove('hidden');
+                    errBox.textContent = translateAuthError(error.message);
+                } else {
+                    showDashboard();
+                    showToast('خوش آمدید مهدی! ورود با موفقیت انجام شد.', 'success');
+                }
+            } catch (err) {
+                errBox.classList.remove('hidden');
+                errBox.textContent = translateAuthError(err.message || 'network');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ورود به داشبورد';
+            }
+        }
+
+        async function handleLogout() {
+            if (sbClient) await sbClient.auth.signOut();
+            document.getElementById('dashboard-section').classList.add('hidden');
+            document.getElementById('logout-btn').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+            showToast('از پنل مدیریت خارج شدید.', 'info');
+        }
+
+        function showDashboard() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            loadAllData();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.className = b.dataset.tab === tab
+                    ? 'tab-btn bg-white text-black px-4 py-2 text-xs font-bold transition'
+                    : 'tab-btn border border-white/20 text-zinc-300 hover:border-white px-4 py-2 text-xs transition';
+            });
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+        }
+
+        async function loadAllData() {
+            if (!sbClient) return;
+            pendingCount = 0;
+            await Promise.all([loadOrders(), loadPortfolioAndVideos(), loadMusic(), loadArticles()]);
+            document.getElementById('stat-pending').textContent = pendingCount;
+            lucide.createIcons();
+        }
+
+        async function uploadMedia(file, folder) {
+            const ext = file.name.split('.').pop();
+            const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            const { error } = await sbClient.storage.from(STORAGE_BUCKET).upload(path, file);
+            if (error) throw error;
+            return sbClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+        }
+
+        // --- PORTFOLIO (PHOTOS + VIDEOS) ---
+        async function loadPortfolioAndVideos() {
+            const { data, error } = await sbClient.from('portfolio').select('*').order('created_at', { ascending: false });
+            const photoContainer = document.getElementById('portfolio-list');
+            const videoContainer = document.getElementById('videos-list');
+
+            if (error) {
+                photoContainer.innerHTML = `<p class="text-crimson text-xs">${error.message}</p>`;
+                videoContainer.innerHTML = `<p class="text-crimson text-xs">${error.message}</p>`;
+                return;
+            }
+
+            cachedPortfolio = data || [];
+            const photos = data.filter(item => item.category !== 'video');
+            const videos = data.filter(item => item.category === 'video');
+
+            pendingCount += data.filter(item => item.status !== 'approved').length;
+
+            document.getElementById('count-portfolio').textContent = photos.length;
+            document.getElementById('stat-portfolio').textContent = photos.length;
+            document.getElementById('count-videos').textContent = videos.length;
+            document.getElementById('stat-videos').textContent = videos.length;
+
+            // Render Photos
+            if (!photos.length) {
+                photoContainer.innerHTML = `<p class="text-zinc-400 text-sm col-span-full">هنوز عکسی در دیتابیس ثبت نشده است.</p>`;
+            } else {
+                photoContainer.innerHTML = photos.map(p => `
+                    <div class="bg-charcoal border ${p.status !== 'approved' ? 'border-gold/60' : 'border-white/15'} overflow-hidden flex flex-col justify-between">
+                        <div>
+                            <div class="aspect-[4/3] bg-black overflow-hidden relative">
+                                <img src="${p.image_url}" class="w-full h-full object-cover">
+                                <span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold ${p.status === 'approved' ? 'bg-emerald-500 text-black' : 'bg-gold text-black'}">${p.status === 'approved' ? 'منتشر شده' : 'در انتظار تایید'}</span>
+                                <span class="absolute top-2 left-2 px-2 py-0.5 text-[10px] bg-black/80 text-white">${p.author_type === 'user' ? 'ارسالی کاربر' : 'مهدی رنجبر'}</span>
+                            </div>
+                            <div class="p-4">
+                                <span class="font-mono text-[10px] text-gold">${p.tag || p.category}</span>
+                                <h4 class="font-bold text-white text-sm mt-0.5">${p.title}</h4>
+                                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">${p.description || ''}</p>
+                            </div>
+                        </div>
+                        <div class="p-4 pt-0 flex flex-wrap items-center gap-2">
+                            ${p.status !== 'approved' ? `<button onclick="updateStatus('portfolio', ${p.id}, 'approved')" class="flex-1 bg-emerald-500 text-black font-bold py-1.5 text-xs hover:bg-emerald-400 transition">تایید و انتشار</button>` : ''}
+                            <button onclick="openEditModal('photo', ${p.id})" class="flex-1 bg-gold/20 text-gold border border-gold/40 py-1.5 text-xs hover:bg-gold hover:text-black transition">ویرایش / جایگزینی</button>
+                            <button onclick="deleteRow('portfolio', ${p.id})" class="flex-1 bg-crimson/20 text-crimson border border-crimson/40 py-1.5 text-xs hover:bg-crimson hover:text-white transition">حذف</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Render Videos
+            if (!videos.length) {
+                videoContainer.innerHTML = `<p class="text-zinc-400 text-sm col-span-full">هنوز ویدیویی در دیتابیس ثبت نشده است.</p>`;
+            } else {
+                videoContainer.innerHTML = videos.map(v => `
+                    <div class="bg-charcoal border ${v.status !== 'approved' ? 'border-gold/60' : 'border-white/15'} overflow-hidden flex flex-col justify-between">
+                        <div>
+                            <div class="aspect-video bg-black relative">
+                                <video controls src="${v.image_url}" class="w-full h-full object-cover"></video>
+                                <span class="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold ${v.status === 'approved' ? 'bg-emerald-500 text-black' : 'bg-gold text-black'}">${v.status === 'approved' ? 'منتشر شده' : 'در انتظار تایید'}</span>
+                            </div>
+                            <div class="p-4">
+                                <span class="font-mono text-[10px] text-gold">${v.tag || 'VIDEO'}</span>
+                                <h4 class="font-bold text-white text-sm mt-0.5">${v.title}</h4>
+                                <p class="text-xs text-zinc-400 mt-1 leading-relaxed">${v.description || ''}</p>
+                            </div>
+                        </div>
+                        <div class="p-4 pt-0 flex flex-wrap items-center gap-2">
+                            ${v.status !== 'approved' ? `<button onclick="updateStatus('portfolio', ${v.id}, 'approved')" class="flex-1 bg-emerald-500 text-black font-bold py-1.5 text-xs hover:bg-emerald-400 transition">تایید و انتشار</button>` : ''}
+                            <button onclick="openEditModal('video', ${v.id})" class="flex-1 bg-gold/20 text-gold border border-gold/40 py-1.5 text-xs hover:bg-gold hover:text-black transition">ویرایش / جایگزینی</button>
+                            <button onclick="deleteRow('portfolio', ${v.id})" class="flex-1 bg-crimson/20 text-crimson border border-crimson/40 py-1.5 text-xs hover:bg-crimson hover:text-white transition">حذف</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function addAdminPortfolio(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'در حال آپلود و انتشار...';
+            try {
+                const url = await uploadMedia(document.getElementById('ap-file').files[0], 'portfolio');
+                const { error } = await sbClient.from('portfolio').insert([{
+                    title: document.getElementById('ap-title').value.trim(),
+                    category: document.getElementById('ap-category').value,
+                    tag: document.getElementById('ap-tag').value.trim() || 'MTRNJBR',
+                    description: document.getElementById('ap-desc').value.trim(),
+                    image_url: url,
+                    author_type: 'admin',
+                    status: 'approved'
+                }]);
+                if (error) throw error;
+                e.target.reset();
+                showToast('عکس جدید با موفقیت در صفحه پورتفولیو منتشر شد!', 'success');
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در ثبت عکس: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'آپلود و انتشار فوری در پورتفولیو';
+            }
+        }
+
+        async function addAdminVideo(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('av-file');
+            const urlInput = document.getElementById('av-url').value.trim();
+
+            if (!fileInput.files.length && !urlInput) {
+                showToast('لطفاً یک فایل ویدیو انتخاب کنید یا لینک مستقیم ویدیو را وارد کنید.', 'error');
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'در حال آپلود ویدیو...';
+            try {
+                const videoUrl = fileInput.files.length
+                    ? await uploadMedia(fileInput.files[0], 'videos')
+                    : urlInput;
+
+                const { error } = await sbClient.from('portfolio').insert([{
+                    title: document.getElementById('av-title').value.trim(),
+                    category: 'video',
+                    tag: document.getElementById('av-duration').value.trim() || '0:15',
+                    description: document.getElementById('av-desc').value.trim(),
+                    image_url: videoUrl,
+                    author_type: 'admin',
+                    status: 'approved'
+                }]);
+                if (error) throw error;
+                e.target.reset();
+                showToast('ویدیو با موفقیت در بخش ویدیوهای پورتفولیو منتشر شد!', 'success');
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در ثبت ویدیو: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'آپلود و انتشار فوری ویدیو در پورتفولیو';
+            }
+        }
+
+        // --- MUSIC ---
+        async function loadMusic() {
+            const { data, error } = await sbClient.from('music').select('*').order('created_at', { ascending: false });
+            const container = document.getElementById('music-list');
+            if (error) return container.innerHTML = `<p class="text-crimson text-xs">${error.message}</p>`;
+
+            cachedMusic = data || [];
+            pendingCount += data.filter(m => m.status !== 'approved').length;
+            document.getElementById('count-music').textContent = data.length;
+            document.getElementById('stat-music').textContent = data.length;
+
+            if (!data.length) return container.innerHTML = `<p class="text-zinc-400 text-sm">موزیکی در دیتابیس ثبت نشده است.</p>`;
+            container.innerHTML = data.map(m => `
+                <div class="bg-charcoal border ${m.status !== 'approved' ? 'border-gold/60' : 'border-white/15'} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h4 class="font-bold text-white text-sm">${m.title}</h4>
+                            <span class="px-2 py-0.5 text-[10px] font-bold ${m.status === 'approved' ? 'bg-emerald-500 text-black' : 'bg-gold text-black'}">${m.status === 'approved' ? 'منتشر شده' : 'در انتظار تایید'}</span>
+                            <span class="text-[10px] text-zinc-400">(${m.author_type === 'user' ? 'ارسالی کاربر' : 'مهدی رنجبر'})</span>
+                        </div>
+                        <p class="text-xs text-zinc-400 font-mono">${m.genre} • ${m.duration}</p>
+                        <audio controls src="${m.audio_url}" class="h-8 mt-2"></audio>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        ${m.status !== 'approved' ? `<button onclick="updateStatus('music', ${m.id}, 'approved')" class="bg-emerald-500 text-black font-bold px-3 py-1.5 text-xs hover:bg-emerald-400 transition">تایید و انتشار</button>` : ''}
+                        <button onclick="openEditModal('music', ${m.id})" class="bg-gold/20 text-gold border border-gold/40 px-3 py-1.5 text-xs hover:bg-gold hover:text-black transition">ویرایش / جایگزینی</button>
+                        <button onclick="deleteRow('music', ${m.id})" class="bg-crimson/20 text-crimson border border-crimson/40 px-3 py-1.5 text-xs hover:bg-crimson hover:text-white transition">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addAdminMusic(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'در حال آپلود...';
+            try {
+                const url = await uploadMedia(document.getElementById('am-file').files[0], 'music');
+                const { error } = await sbClient.from('music').insert([{
+                    title: document.getElementById('am-title').value.trim(),
+                    genre: document.getElementById('am-genre').value.trim(),
+                    duration: document.getElementById('am-duration').value.trim(),
+                    audio_url: url,
+                    author_type: 'admin',
+                    status: 'approved'
+                }]);
+                if (error) throw error;
+                e.target.reset();
+                showToast('قطعه موسیقی جدید در صفحه موزیک منتشر شد!', 'success');
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در ثبت موزیک: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'آپلود و انتشار فوری موزیک';
+            }
+        }
+
+        // --- ARTICLES ---
+        async function loadArticles() {
+            const { data, error } = await sbClient.from('articles').select('*').order('created_at', { ascending: false });
+            const container = document.getElementById('articles-list');
+            if (error) return container.innerHTML = `<p class="text-crimson text-xs">${error.message}</p>`;
+
+            cachedArticles = data || [];
+            pendingCount += data.filter(a => a.status !== 'approved').length;
+            document.getElementById('count-articles').textContent = data.length;
+            document.getElementById('stat-articles').textContent = data.length;
+
+            if (!data.length) return container.innerHTML = `<p class="text-zinc-400 text-sm">مقاله‌ای در دیتابیس ثبت نشده است.</p>`;
+            container.innerHTML = data.map(a => `
+                <div class="bg-charcoal border ${a.status !== 'approved' ? 'border-gold/60' : 'border-white/15'} p-5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="font-mono text-[10px] text-gold">${a.category || 'ARTICLE'} • ${a.read_time || ''}</span>
+                            <h4 class="font-bold text-white mt-0.5">${a.title}</h4>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-[10px] font-bold ${a.status === 'approved' ? 'bg-emerald-500 text-black' : 'bg-gold text-black'}">${a.status === 'approved' ? 'منتشر شده' : 'در انتظار تایید'}</span>
+                            <span class="text-[10px] text-zinc-400">(${a.author_type === 'user' ? 'ارسالی کاربر' : 'مهدی رنجبر'})</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-zinc-300 leading-relaxed">${a.summary || ''}</p>
+                    <details class="text-xs text-zinc-400 pt-1">
+                        <summary class="cursor-pointer text-gold hover:underline">مشاهده متن کامل مقاله</summary>
+                        <p class="mt-2 p-3 bg-obsidian border border-white/10 whitespace-pre-line leading-relaxed">${a.content || ''}</p>
+                    </details>
+                    <div class="flex flex-wrap items-center gap-2 pt-2">
+                        ${a.status !== 'approved' ? `<button onclick="updateStatus('articles', ${a.id}, 'approved')" class="bg-emerald-500 text-black font-bold px-3 py-1.5 text-xs hover:bg-emerald-400 transition">تایید و انتشار</button>` : ''}
+                        <button onclick="openEditModal('article', ${a.id})" class="bg-gold/20 text-gold border border-gold/40 px-3 py-1.5 text-xs hover:bg-gold hover:text-black transition">ویرایش مقاله</button>
+                        <button onclick="deleteRow('articles', ${a.id})" class="bg-crimson/20 text-crimson border border-crimson/40 px-3 py-1.5 text-xs hover:bg-crimson hover:text-white transition">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addAdminArticle(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'در حال انتشار...';
+            try {
+                const { error } = await sbClient.from('articles').insert([{
+                    title: document.getElementById('aa-title').value.trim(),
+                    category: document.getElementById('aa-category').value.trim(),
+                    read_time: document.getElementById('aa-readtime').value.trim(),
+                    summary: document.getElementById('aa-summary').value.trim(),
+                    content: document.getElementById('aa-content').value.trim(),
+                    author_type: 'admin',
+                    status: 'approved'
+                }]);
+                if (error) throw error;
+                e.target.reset();
+                showToast('مقاله جدید با موفقیت در صفحه مقالات منتشر شد!', 'success');
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در انتشار مقاله: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'انتشار فوری مقاله';
+            }
+        }
+
+        // --- ORDERS ---
+        async function loadOrders() {
+            const { data, error } = await sbClient.from('orders').select('*').order('created_at', { ascending: false });
+            const container = document.getElementById('orders-list');
+            if (error) return container.innerHTML = `<p class="text-crimson text-xs">${error.message}</p>`;
+            document.getElementById('count-orders').textContent = data.length;
+
+            if (!data.length) return container.innerHTML = `<p class="text-zinc-400 text-sm">هنوز سفارشی ثبت نشده است.</p>`;
+            container.innerHTML = data.map(o => `
+                <div class="bg-charcoal border border-white/15 p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-white">${o.client_name}</h4>
+                        <span class="px-2 py-0.5 text-[10px] font-mono ${o.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gold/20 text-gold'}">${o.status === 'completed' ? 'تکمیل شده' : 'سفارش جدید'}</span>
+                    </div>
+                    <div class="text-xs text-zinc-300 space-y-1">
+                        <div><strong>تماس:</strong> ${o.contact_info}</div>
+                        <div><strong>خدمات:</strong> ${o.service_type}</div>
+                        <div><strong>بودجه/زمان:</strong> ${o.budget_timeline || '-'}</div>
+                    </div>
+                    <p class="text-xs text-zinc-400 bg-obsidian p-3 border border-white/10 leading-relaxed">${o.project_details}</p>
+                    <div class="flex items-center gap-2 pt-2">
+                        ${o.status !== 'completed' ? `<button onclick="updateStatus('orders', ${o.id}, 'completed')" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 text-xs hover:bg-emerald-500 hover:text-black transition">علامت‌گذاری تکمیل شده</button>` : ''}
+                        <button onclick="deleteRow('orders', ${o.id})" class="bg-crimson/20 text-crimson border border-crimson/40 px-3 py-1 text-xs hover:bg-crimson hover:text-white transition">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- SHARED ACTIONS ---
+        async function updateStatus(table, id, newStatus) {
+            const { error } = await sbClient.from(table).update({ status: newStatus }).eq('id', id);
+            if (error) showToast('خطا: ' + error.message, 'error');
+            else {
+                showToast('وضعیت با موفقیت به‌روزرسانی و در سایت اعمال شد.', 'success');
+                loadAllData();
+            }
+        }
+
+        async function deleteRow(table, id) {
+            if (!confirm('آیا از حذف دائمی این مورد مطمئن هستید؟')) return;
+            const { error } = await sbClient.from(table).delete().eq('id', id);
+            if (error) showToast('خطا در حذف: ' + error.message, 'error');
+            else {
+                showToast('مورد با موفقیت حذف شد.', 'info');
+                loadAllData();
+            }
+        }
+
+
+        // --- EDIT & REPLACE MODAL ---
+        function escHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function openEditModal(type, id) {
+            currentEditCtx = { type, id };
+            const titleEl = document.getElementById('edit-modal-title');
+            const fieldsEl = document.getElementById('edit-modal-fields');
+
+            if (type === 'photo') {
+                const item = cachedPortfolio.find(x => x.id === id);
+                if (!item) return;
+                titleEl.textContent = 'ویرایش یا جایگزینی عکس پورتفولیو';
+                fieldsEl.innerHTML = `
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">عنوان عکس *</label>
+                        <input type="text" id="ed-title" required value="${escHtml(item.title)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">دسته‌بندی</label>
+                            <select id="ed-category" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                                <option value="monochrome" ${item.category === 'monochrome' ? 'selected' : ''}>سیاه‌وسفید و سایه (monochrome)</option>
+                                <option value="portrait" ${item.category === 'portrait' ? 'selected' : ''}>پرتره و روایت (portrait)</option>
+                                <option value="city" ${item.category === 'city' ? 'selected' : ''}>شهر و معماری (city)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">تگ</label>
+                            <input type="text" id="ed-tag" value="${escHtml(item.tag)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">توضیحات عکس</label>
+                        <textarea id="ed-desc" rows="3" class="w-full bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none">${escHtml(item.description)}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gold mb-1">جایگزینی عکس جدید (اختیاری - اگر خالی بماند عکس فعلی حفظ می‌شود)</label>
+                        <input type="file" id="ed-file" accept="image/*" class="w-full bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    </div>
+                `;
+            } else if (type === 'video') {
+                const item = cachedPortfolio.find(x => x.id === id);
+                if (!item) return;
+                titleEl.textContent = 'ویرایش یا جایگزینی ویدیو / تیزر';
+                fieldsEl.innerHTML = `
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">عنوان ویدیو *</label>
+                        <input type="text" id="ed-title" required value="${escHtml(item.title)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">مدت زمان</label>
+                        <input type="text" id="ed-duration" value="${escHtml(item.tag)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">توضیحات ویدیو</label>
+                        <textarea id="ed-desc" rows="3" class="w-full bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none">${escHtml(item.description)}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gold mb-1">آپلود فایل ویدیوی جدید برای جایگزینی (اختیاری)</label>
+                        <input type="file" id="ed-file" accept="video/*" class="w-full bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">یا لینک مستقیم ویدیو</label>
+                        <input type="url" id="ed-url" value="${escHtml(item.image_url)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                `;
+            } else if (type === 'music') {
+                const item = cachedMusic.find(x => x.id === id);
+                if (!item) return;
+                titleEl.textContent = 'ویرایش یا جایگزینی قطعه موسیقی';
+                fieldsEl.innerHTML = `
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">نام قطعه *</label>
+                        <input type="text" id="ed-title" required value="${escHtml(item.title)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">سبک *</label>
+                            <input type="text" id="ed-genre" required value="${escHtml(item.genre)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">مدت زمان *</label>
+                            <input type="text" id="ed-duration" required value="${escHtml(item.duration)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gold mb-1">جایگزینی فایل صوتی جدید (اختیاری)</label>
+                        <input type="file" id="ed-file" accept="audio/*" class="w-full bg-obsidian border border-dashed border-white/30 px-3 py-2 text-xs text-zinc-300">
+                    </div>
+                `;
+            } else if (type === 'article') {
+                const item = cachedArticles.find(x => x.id === id);
+                if (!item) return;
+                titleEl.textContent = 'ویرایش مقاله';
+                fieldsEl.innerHTML = `
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">عنوان مقاله *</label>
+                        <input type="text" id="ed-title" required value="${escHtml(item.title)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">دسته‌بندی *</label>
+                            <input type="text" id="ed-category" required value="${escHtml(item.category)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-300 mb-1">زمان مطالعه *</label>
+                            <input type="text" id="ed-readtime" required value="${escHtml(item.read_time)}" class="w-full bg-obsidian border border-white/20 px-3.5 py-2.5 text-sm text-white focus:border-gold focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">خلاصه مقاله *</label>
+                        <textarea id="ed-summary" rows="2" required class="w-full bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none">${escHtml(item.summary)}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-300 mb-1">متن کامل مقاله *</label>
+                        <textarea id="ed-content" rows="6" required class="w-full bg-obsidian border border-white/20 p-3 text-sm text-white focus:border-gold focus:outline-none">${escHtml(item.content)}</textarea>
+                    </div>
+                `;
+            }
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            currentEditCtx = null;
+        }
+
+        async function submitEditModal(e) {
+            e.preventDefault();
+            if (!currentEditCtx) return;
+            const { type, id } = currentEditCtx;
+            const btn = document.getElementById('edit-submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'در حال ذخیره...';
+
+            try {
+                if (type === 'photo') {
+                    const updates = {
+                        title: document.getElementById('ed-title').value.trim(),
+                        category: document.getElementById('ed-category').value,
+                        tag: document.getElementById('ed-tag').value.trim() || 'MTRNJBR',
+                        description: document.getElementById('ed-desc').value.trim()
+                    };
+                    const fileInput = document.getElementById('ed-file');
+                    if (fileInput.files.length > 0) {
+                        updates.image_url = await uploadMedia(fileInput.files[0], 'portfolio');
+                    }
+                    const { error } = await sbClient.from('portfolio').update(updates).eq('id', id);
+                    if (error) throw error;
+                } else if (type === 'video') {
+                    const updates = {
+                        title: document.getElementById('ed-title').value.trim(),
+                        tag: document.getElementById('ed-duration').value.trim() || '0:15',
+                        description: document.getElementById('ed-desc').value.trim()
+                    };
+                    const fileInput = document.getElementById('ed-file');
+                    const urlInput = document.getElementById('ed-url').value.trim();
+                    if (fileInput.files.length > 0) {
+                        updates.image_url = await uploadMedia(fileInput.files[0], 'videos');
+                    } else if (urlInput) {
+                        updates.image_url = urlInput;
+                    }
+                    const { error } = await sbClient.from('portfolio').update(updates).eq('id', id);
+                    if (error) throw error;
+                } else if (type === 'music') {
+                    const updates = {
+                        title: document.getElementById('ed-title').value.trim(),
+                        genre: document.getElementById('ed-genre').value.trim(),
+                        duration: document.getElementById('ed-duration').value.trim()
+                    };
+                    const fileInput = document.getElementById('ed-file');
+                    if (fileInput.files.length > 0) {
+                        updates.audio_url = await uploadMedia(fileInput.files[0], 'music');
+                    }
+                    const { error } = await sbClient.from('music').update(updates).eq('id', id);
+                    if (error) throw error;
+                } else if (type === 'article') {
+                    const updates = {
+                        title: document.getElementById('ed-title').value.trim(),
+                        category: document.getElementById('ed-category').value.trim(),
+                        read_time: document.getElementById('ed-readtime').value.trim(),
+                        summary: document.getElementById('ed-summary').value.trim(),
+                        content: document.getElementById('ed-content').value.trim()
+                    };
+                    const { error } = await sbClient.from('articles').update(updates).eq('id', id);
+                    if (error) throw error;
+                }
+
+                closeEditModal();
+                showToast('تغییرات با موفقیت ذخیره و در سایت اعمال شد!', 'success');
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در ذخیره تغییرات: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ذخیره تغییرات';
+            }
+        }
+
+
+        // --- IMPORT DEFAULT SITE CONTENT INTO SUPABASE ---
+        const DEFAULT_SITE_PHOTOS = [
+            { title: 'سایه و لوگوی Hurley در تاریکی مطلق', category: 'monochrome', tag: 'STUDIO LOW-KEY', description: 'پرتره مینیمال از پشت سر در تاریکی مطلق استودیو با کنتراست نوری ظریف.', image_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'مکث در خیابان؛ تکیه بر پژو کلاسیک', category: 'monochrome', tag: 'STREET CINEMA', description: 'ثبت سیاه‌وسفید سینمایی با عمق میدان کم؛ جوان در حال روشن کردن سیگار تکیه داده به خودرو.', image_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'هلال ماه و پرندگان بر لبه بام در گرگ‌ومیش', category: 'city', tag: 'MINIMAL SKY', description: 'ترکیب‌بندی مینیمال از سیلوئت پرندگان بر سازه بتنی و هلال باریک ماه در آسمان نارنجی و سرمه‌ای.', image_url: 'https://images.unsplash.com/photo-1507400492013-162706c8c05e?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'پرتره کلاه مشکی در سازه بتنی متروکه', category: 'portrait', tag: 'DARK PORTRAIT', description: 'پرتره سر به زیر با کلاه کپ مشکی و تیشرت Hurley در میان ستون‌های بتنی بروتالیست.', image_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'آشفتگی ذهن؛ قرینه‌سازی موشن بلور سیاه‌وسفید', category: 'monochrome', tag: 'ABSTRACT MOTION', description: 'اثر مفهومی با تکنیک Long Exposure و تقارن آینه‌ای که حس تعلیق و دوگانگی انسان را القا می‌کند.', image_url: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'بر فراز باغ‌شهر؛ چشم‌انداز مونوکروم', category: 'monochrome', tag: 'AERIAL VISTA', description: 'ایستاده بر بلندی مشرف به درختان انبوه و آپارتمان‌های شهر در نور درخشان روز.', image_url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'هم‌نشینی هلال ماه و زهره در آسمان ارغوانی', category: 'city', tag: 'TWILIGHT', description: 'قاب شاعرانه از هلال ماه و سیاره درخشان در میان سیلوئت شاخه‌های درختان در غروب بنفش.', image_url: 'https://images.unsplash.com/photo-1532693322450-2cb5c511067d?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'انزوا در جنگل سرد زمستانی', category: 'portrait', tag: 'MOODY COLOR', description: 'کالردیزاین فیروزه‌ای و سرد از نیم‌رخ پوشیده در هودی راه‌راه میان شاخه‌های خشکیده.', image_url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'پرتره نئونی آبی در فضای مدرن شبانه', category: 'portrait', tag: 'NEON FASHION', description: 'عکاسی فشن و پرتره با نورپردازی نئون آبی الکتریک و کنتراست گرم پله‌ها.', image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'قدم زدن در هزارتوی اسکلت بتنی', category: 'monochrome', tag: 'ARCHITECTURAL', description: 'پرسپکتیو تک‌نقطه‌ای خیره‌کننده در یک سازه بتنی عظیم نیمه‌کاره.', image_url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'درگاه بتنی؛ بازی نور گرم و دیوارهای بافت‌دار', category: 'portrait', tag: 'FRAMING', description: 'استفاده از خطوط عمودی دیوار بتنی برای قاب گرفتن سوژه در نور طلایی شب.', image_url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'کنتراست کاپشن آجری بر دیوار کرکره‌ای فرسوده', category: 'portrait', tag: 'URBAN PORTRAIT', description: 'پرتره خیابانی با تکنیک Selective Color و سایه‌های مورب تند.', image_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'کاور آرت «اجباری»؛ نئون‌های سرخ خیابان خیس', category: 'city', tag: 'COVER ART / STREET', description: 'ترکیب عکاسی لانگ‌اکسپوژر خیابانی، تابلوهای نئون فارسی و تایپوگرافی «اجباری».', image_url: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'حیاط خلوت پاییزی؛ برگ‌های سرخ بر زمین خاکستری', category: 'monochrome', tag: 'SELECTIVE RED', description: 'کنتراست شاعرانه دیوارهای آجری و برگ‌های ریخته‌شده سیاه‌وسفید با تاج سرخ درختان.', image_url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'طلوع ماه کامل طلایی بر فراز بام‌های صنعتی', category: 'city', tag: 'ASTRO URBAN', description: 'ثبت تله‌فوتو از قرص کامل ماه با جزئیات دقیق در کنار سیلوئت سازه‌های فلزی بام.', image_url: 'https://images.unsplash.com/photo-1532693322450-2cb5c511067d?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'آینه‌کاری و مقرنس‌های طلایی؛ شکوه معماری ایرانی', category: 'city', tag: 'HERITAGE ARCH', description: 'ثبت تقارن خیره‌کننده و بازتاب هزاران قطعه آینه و نور طلایی در معماری سنتی شیراز.', image_url: 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'شبح در دالان آینه‌ای؛ سوررئالیسم تاریک', category: 'monochrome', tag: 'DARK SURREAL', description: 'خلق فضای گوتیک و رازآلود با اعوجاج نوری و سیلوئت مرکزی.', image_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'سرعت در ایستگاه مترو شهید دستغیب شیراز', category: 'city', tag: 'MOTION BLUR', description: 'ثبت حرکت قطار مترو و سقف موج‌دار آجری زردرنگ ایستگاه با تکنیک شاتر پایین.', image_url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'رنج و کار؛ زاویه دید از بالا (Bird-Eye Documentary)', category: 'portrait', tag: 'DOCUMENTARY', description: 'عکاسی مستند اجتماعی با بافت‌های سنگی و روایت زندگی روزمره.', image_url: 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'پرتره در مه خاکستری؛ نگاه نافذ', category: 'portrait', tag: 'CINEMATIC FOG', description: 'نورپردازی سینمایی نرم در میان دود و مه غلیظ با پس‌زمینه شهری تاریک.', image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'ملودی باد و کلاغ‌ها؛ ویولن‌نواز در دشت ابری', category: 'portrait', tag: 'FINE ART STORY', description: 'عکاسی فاین‌آرت داستانی؛ دختر ویولن‌نواز در باد با پرواز پرندگان سیاه در آسمان طوفانی.', image_url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' },
+            { title: 'فرشته ویولن‌نواز در کوچه آجرپاره قدیمی و ماه ارگ کریم‌خان', category: 'portrait', tag: 'MAGICAL REALISM', description: 'تلفیق رئالیسم جادویی (بال‌های سفید فرشته در کوچه سنتی شیراز)، هاله خار بر سر در معماری کلاسیک و رنگ‌های بازار.', image_url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80', author_type: 'admin', status: 'approved' }
+        ];
+
+        const DEFAULT_SITE_VIDEOS = [
+            { title: '۰۱. روایت غروب شیراز: «نگاه کن به این شهر، پر از ناگفته‌هاست»', category: 'video', tag: '0:10', description: 'ایستاده بر فراز کوه‌های شیراز در گرگ‌ومیش غروب و هلال ماه؛ چرخش به سمت دوربین با کلاه نارنجی و نریشن عمیق فارسی همراه با ذرات معلق طلایی در آسمان.', image_url: 'https://assets.mixkit.co/videos/preview/mixkit-man-looking-at-the-city-at-night-42617-large.mp4', author_type: 'admin', status: 'approved' },
+            { title: '۰۲. کسوف سرخ بر پل فلزی (Red Eclipse)', category: 'video', tag: '0:10', description: 'کات‌های سریع سینمایی از قدم زدن روی پل مشبک فلزی در آسمان سرخ نئونی، حلقه آتشین در پس‌زمینه، دود سرخ و تدوین ریتمیک کوبنده.', image_url: 'https://assets.mixkit.co/videos/preview/mixkit-silhouette-of-a-man-walking-in-a-tunnel-42874-large.mp4', author_type: 'admin', status: 'approved' },
+            { title: '۰۳. توهم خطوط نوری و سایه‌ها (Monochrome Illusion)', category: 'video', tag: '0:08', description: 'پویانمایی سیاه‌وسفید سوررئال؛ چهره پوشیده در هودی میان امواج متحرک خطوط نوری سفید، مه و تکثیر سایه‌ها در تونل پرسپکتیو.', image_url: 'https://assets.mixkit.co/videos/preview/mixkit-abstract-black-and-white-lines-moving-42929-large.mp4', author_type: 'admin', status: 'approved' },
+            { title: '۰۴. هایپرلپس هوایی شب‌های شیراز تا خیابان بارانی', category: 'video', tag: '0:06', description: 'پرواز بر فراز بلوارهای نورانی شیراز در شب و ترنزیشن سرعتی (Speed Ramp) به سطح خیابان خیس از باران با انعکاس چراغ‌های کلاسیک.', image_url: 'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-11-large.mp4', author_type: 'admin', status: 'approved' }
+        ];
+
+        const DEFAULT_SITE_MUSIC = [
+            { title: 'ناگفته‌های شهر (Untold Shiraz)', genre: 'Cinematic Dark Ambient / Spoken Word • Suno AI', duration: '03:18', audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', author_type: 'admin', status: 'approved' },
+            { title: 'اجباری و کسوف سرخ (Red Eclipse)', genre: 'Dark Trap / Cyberpunk Synth • Suno AI', duration: '02:45', audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', author_type: 'admin', status: 'approved' },
+            { title: 'سایه‌های مونوکروم (Monochrome Shadows)', genre: 'Experimental Lo-Fi & Violin • Suno AI', duration: '03:52', audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', author_type: 'admin', status: 'approved' },
+            { title: 'کوچه‌های آجرپاره (Wings in the Alley)', genre: 'Neo-Classical / Ethereal • Suno AI', duration: '04:10', audio_url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', author_type: 'admin', status: 'approved' }
+        ];
+
+        const DEFAULT_SITE_ARTICLES = [
+            { title: 'چگونه یک تک‌عکس سیاه‌وسفید می‌تواند به اندازه یک فیلم کوتاه داستان بگوید؟', category: 'VISUAL STORYTELLING', read_time: '۵ دقیقه مطالعه', summary: 'بررسی نقش کنتراست، فضای منفی (Negative Space) و زبان بدن سوژه در خلق روایت‌های مونوکروم شهری و تجربه حضور در جشنواره 35AWARDS.', content: 'در عکاسی دارک و مونوکروم، وقتی رنگ را حذف می‌کنیم، نگاه مخاطب مستقیماً به سمت نور، بافت و احساس هدایت می‌شود. در پروژه‌هایی که در شیراز ثبت کرده‌ام، همیشه تلاش کرده‌ام مرز بین مستند خیابانی و سینما را کمرنگ کنم. یک سایه تند روی دیوار بتنی یا نگاه خیره‌ی سوژه در میان مه، به مخاطب اجازه می‌دهد خودش ادامه داستان را در ذهنش بسازد...', author_type: 'admin', status: 'approved' },
+            { title: 'ریتم در تدوین و جادوی ترنزیشن‌های نوری (از هلی‌شات تا کف خیابان)', category: 'FILMMAKING & EDIT', read_time: '۶ دقیقه مطالعه', summary: 'چطور با ترکیب Speed Ramp، طراحی صدای دقیق (Sound Design) و جلوه‌های بصری، تیزرهایی بسازیم که مخاطب در ۳ ثانیه اول میخکوب شود.', content: 'تدوین فقط کنار هم گذاشتن پلان‌ها نیست؛ تدوین یعنی کارگردانیِ دوباره فیلم روی تایم‌لاین. وقتی یک پلان هوایی از شب‌های شهر را با یک حرکت سرعتی به سطح خیس آسفالت خیابان متصل می‌کنیم، ضربان قلب تصویر با موسیقی هماهنگ می‌شود...', author_type: 'admin', status: 'approved' },
+            { title: 'تلفیق موسیقی هوش مصنوعی (Suno AI) با کارگردانی ویدیوهای هنری', category: 'AI & MUSIC PRODUCTION', read_time: '۴ دقیقه مطالعه', summary: 'تجربه شخصی من در مهندسی پرامپت‌های موسیقایی در Suno برای ساخت موسیقی متن اختصاصی که دقیقاً با اتمسفر ویدیوها هم‌خوانی دارد.', content: 'یکی از بزرگ‌ترین چالش‌های فیلم‌سازان و تدوین‌گران، پیدا کردن موسیقی متنی است که دقیقاً حس و حال درونی پروژه را منتقل کند. با ابزارهایی مثل Suno AI، من اکنون می‌توانم برای هر پروژه ویدیویی، ترک اختصاصی خودش را با اتمسفر دلخواه (از دارک امبینت تا نئوکلاسیک و ترپ) خلق کنم...', author_type: 'admin', status: 'approved' }
+        ];
+
+        async function importDefaultSiteContent() {
+            const btn = document.getElementById('sync-default-btn');
+            btn.disabled = true;
+            btn.textContent = 'در حال انتقال به دیتابیس...';
+            try {
+                let insertedCount = 0;
+
+                if (cachedPortfolio.filter(x => x.category !== 'video').length === 0) {
+                    const { error } = await sbClient.from('portfolio').insert(DEFAULT_SITE_PHOTOS);
+                    if (error) throw new Error('جدول portfolio (عکس‌ها): ' + error.message);
+                    insertedCount += DEFAULT_SITE_PHOTOS.length;
+                }
+                if (cachedPortfolio.filter(x => x.category === 'video').length === 0) {
+                    const { error } = await sbClient.from('portfolio').insert(DEFAULT_SITE_VIDEOS);
+                    if (error) throw new Error('جدول portfolio (ویدیوها): ' + error.message);
+                    insertedCount += DEFAULT_SITE_VIDEOS.length;
+                }
+                if (cachedMusic.length === 0) {
+                    const { error } = await sbClient.from('music').insert(DEFAULT_SITE_MUSIC);
+                    if (error) throw new Error('جدول music: ' + error.message);
+                    insertedCount += DEFAULT_SITE_MUSIC.length;
+                }
+                if (cachedArticles.length === 0) {
+                    const { error } = await sbClient.from('articles').insert(DEFAULT_SITE_ARTICLES);
+                    if (error) throw new Error('جدول articles: ' + error.message);
+                    insertedCount += DEFAULT_SITE_ARTICLES.length;
+                }
+
+                if (insertedCount === 0) {
+                    showToast('تمام بخش‌ها از قبل دارای محتوا در دیتابیس هستند.', 'info');
+                } else {
+                    showToast(`${insertedCount} آیتم با موفقیت وارد پنل مدیریت شد! اکنون می‌توانید همه را ویرایش یا جایگزین کنید.`, 'success');
+                }
+                await loadAllData();
+            } catch (err) {
+                showToast('خطا در انتقال: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'وارد کردن محتوای فعلی سایت به پنل';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', checkSession);
+    </script>
+</body>
+</html>
